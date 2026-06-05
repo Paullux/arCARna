@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/images/bandeau.png" alt="arCARna" width="100%">
+</p>
+
 # arCARna 🏎️🌃
 
 Jeu de course **arcade néon** sous **Godot 4.x** (style Asphalt : sensation de vitesse exagérée,
