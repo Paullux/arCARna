@@ -4,6 +4,9 @@
 /builds/
 *.tmp
 
+# Claude Code (config locale, machine-spécifique)
+.claude/settings.local.json
+
 # OS
 Thumbs.db
 .DS_Store

@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell($g = \"G:\\\\SteamLibrary\\\\steamapps\\\\common\\\\Godot Engine\\\\godot.windows.opt.tools.64.exe\"; $out = & $g --headless --path \"I:\\\\arCARna\" --import 2>&1 | Out-String; if\\($out -match \"ERROR|Parse Error|SCRIPT ERROR\"\\){ \\($out -split \"`n\" | Select-String \"ERROR|Parse|SCRIPT\"\\) } else { \"OK\" })",
-      "PowerShell(Get-ChildItem -Path \"I:\\\\arCARna\\\\assets\\\\images\" -Recurse -File | Select-Object FullName, @{N='KB';E={[math]::Round\\($_.Length/1KB,1\\)}})"
-    ]
-  }
-}
