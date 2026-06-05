@@ -1,0 +1,45 @@
+name: Export arCARna
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Version Godot — ajuster pour correspondre à votre éditeur (ex. 4.3, 4.4...).
+env:
+  GODOT_VERSION: "4.6.3"
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Télécharger Godot + templates
+        run: |
+          BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          wget -q "${BASE}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          wget -q "${BASE}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q "Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          chmod +x "Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          unzip -q "Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mv templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+
+      - name: Importer les ressources
+        run: |
+          ./godot --headless --path . --import || true
+
+      - name: Exporter Windows + Linux
+        run: |
+          mkdir -p build/windows build/linux
+          ./godot --headless --path . --export-release "Windows Desktop" build/windows/arCARna.exe
+          ./godot --headless --path . --export-release "Linux" build/linux/arCARna.x86_64
+
+      - name: Publier les artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arCARna-builds
+          path: build/
+          if-no-files-found: warn

@@ -1,0 +1,10 @@
+# Godot 4
+.godot/
+/build/
+/builds/
+*.tmp
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini

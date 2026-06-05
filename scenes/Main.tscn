@@ -1,0 +1,120 @@
+[gd_scene format=3 uid="uid://dxcmvvuumxfn0"]
+
+[ext_resource type="Environment" uid="uid://cbnafwuhwmrnj" path="res://default_env.tres" id="1_env"]
+[ext_resource type="PackedScene" uid="uid://bnk102jvm81jj" path="res://scenes/Player.tscn" id="2_player"]
+[ext_resource type="Script" uid="uid://du8sxtj5docc3" path="res://scripts/hud_debug.gd" id="4_hud"]
+[ext_resource type="PackedScene" uid="uid://bswr1yn7vwtnq" path="res://assets/models/First_Track.glb" id="5_track"]
+[ext_resource type="Script" uid="uid://crawxdsv3202g" path="res://scripts/track_setup.gd" id="6_setup"]
+[ext_resource type="Script" uid="uid://clfywydkt037d" path="res://scripts/wall_builder.gd" id="9_walls"]
+[ext_resource type="Script" uid="uid://dtnxr51acycrn" path="res://scripts/chevrons.gd" id="10_chevrons"]
+[ext_resource type="Script" uid="uid://bbt7du3p3o5g7" path="res://scripts/pit_zone.gd" id="12_pit"]
+[ext_resource type="Script" uid="uid://ciji8nldvyccq" path="res://scripts/nitro_trail.gd" id="13_trail"]
+[ext_resource type="Shader" uid="uid://dcxn8vl8bnnrv" path="res://assets/shaders/checker.gdshader" id="14_checker"]
+[ext_resource type="Script" uid="uid://dwnpt4ko7xkjq" path="res://scripts/finish_line.gd" id="15_finish"]
+[ext_resource type="Script" uid="uid://ckx43nmrto4ec" path="res://scripts/traffic_manager.gd" id="16_traffic"]
+
+[sub_resource type="BoxShape3D" id="PitBox"]
+size = Vector3(264, 16, 66)
+
+[sub_resource type="BoxMesh" id="PadMesh"]
+size = Vector3(264, 0.15, 58)
+
+[sub_resource type="BoxMesh" id="StartLineMesh"]
+size = Vector3(8, 0.1, 70)
+
+[sub_resource type="ShaderMaterial" id="StartMat"]
+render_priority = 0
+shader = ExtResource("14_checker")
+shader_parameter/square_size = 4.0
+shader_parameter/col_a = Color(0.95, 0.95, 0.95, 1)
+shader_parameter/col_b = Color(0.02, 0.02, 0.02, 1)
+shader_parameter/emit = 0.5
+
+[sub_resource type="BoxShape3D" id="FinishBox"]
+size = Vector3(6, 16, 72)
+
+[sub_resource type="PlaneMesh" id="Plane"]
+size = Vector2(4000, 4000)
+
+[sub_resource type="StandardMaterial3D" id="Ground_mat"]
+specular_mode = 1
+albedo_color = Color(0.025, 0.025, 0.04, 1)
+
+[sub_resource type="WorldBoundaryShape3D" id="Floor"]
+
+[node name="Main" type="Node3D" unique_id=132569282]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1343852974]
+environment = ExtResource("1_env")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=758326441]
+transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 0, 20, 0)
+shadow_enabled = true
+
+[node name="Track" type="Node3D" parent="." unique_id=55561198]
+transform = Transform3D(240, 0, 0, 0, 240, 0, 0, 0, 240, 0, 0, 0)
+script = ExtResource("6_setup")
+
+[node name="Model" parent="Track" unique_id=1999848212 instance=ExtResource("5_track")]
+
+[node name="Walls" type="Node3D" parent="." unique_id=1239621163]
+script = ExtResource("9_walls")
+
+[node name="Chevrons" type="Node3D" parent="." unique_id=2006243089]
+script = ExtResource("10_chevrons")
+
+[node name="TrafficManager" type="Node3D" parent="." unique_id=410532776]
+script = ExtResource("16_traffic")
+
+[node name="PitZone" type="Area3D" parent="." unique_id=452528954]
+transform = Transform3D(1.0999582, 0.008726535, 0, -0.009599189, 0.9999619, 0, 0, 0, 0.55, -0.95648575, 0, -0.63936806)
+script = ExtResource("12_pit")
+flow_axis = Vector2(1, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PitZone" unique_id=1846969740]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 6, 44)
+shape = SubResource("PitBox")
+
+[node name="Pad" type="MeshInstance3D" parent="PitZone" unique_id=899042522]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1.5, 44)
+mesh = SubResource("PadMesh")
+
+[node name="StartLine" type="MeshInstance3D" parent="." unique_id=250725828]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 44)
+mesh = SubResource("StartLineMesh")
+surface_material_override/0 = SubResource("StartMat")
+
+[node name="FinishLine" type="Area3D" parent="." unique_id=2121426356]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 44)
+script = ExtResource("15_finish")
+
+[node name="FinishCol" type="CollisionShape3D" parent="FinishLine" unique_id=1937017459]
+shape = SubResource("FinishBox")
+
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1132420431]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+
+[node name="GroundMesh" type="MeshInstance3D" parent="Ground" unique_id=873680680]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22311401, 0.18404293, -0.47309113)
+mesh = SubResource("Plane")
+surface_material_override/0 = SubResource("Ground_mat")
+
+[node name="GroundCol" type="CollisionShape3D" parent="Ground" unique_id=89558220]
+shape = SubResource("Floor")
+
+[node name="Player" parent="." unique_id=520020157 instance=ExtResource("2_player")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 0, 9, 48)
+
+[node name="NitroTrail" type="MeshInstance3D" parent="." unique_id=2024865691]
+script = ExtResource("13_trail")
+player_path = NodePath("../Player")
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=1869162343]
+
+[node name="Root" type="Control" parent="HUD" unique_id=265697368]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("4_hud")
+player_path = NodePath("../../Player")

@@ -1,0 +1,56 @@
+[gd_scene load_steps=6 format=3 uid="uid://b1arcarnaplayer0"]
+
+[ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/camera_rig.gd" id="2_camrig"]
+[ext_resource type="PackedScene" uid="uid://caoh6ej14mx3c" path="res://assets/models/futuristic_car.glb" id="3_car"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(1.9, 1.0, 4.0)
+
+[sub_resource type="SphereMesh" id="AuraMesh"]
+radius = 3.2
+height = 6.4
+radial_segments = 24
+rings = 12
+
+[sub_resource type="StandardMaterial3D" id="AuraMat"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+cull_mode = 1
+albedo_color = Color(0.25, 1, 0.55, 0.6)
+
+[node name="Player" type="CharacterBody3D"]
+script = ExtResource("1_player")
+
+[node name="CarMesh" type="Node3D" parent="."]
+
+[node name="Model" parent="CarMesh" instance=ExtResource("3_car")]
+transform = Transform3D(-2.2, 0, 0, 0, 2.2, 0, 0, 0, -2.2, 0, 0, 0)
+
+[node name="Underglow" type="OmniLight3D" parent="CarMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+light_color = Color(0.2, 0.8, 1, 1)
+light_energy = 2.5
+omni_range = 6.0
+omni_attenuation = 1.5
+
+[node name="RechargeAura" type="MeshInstance3D" parent="CarMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+visible = false
+mesh = SubResource("AuraMesh")
+surface_material_override/0 = SubResource("AuraMat")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("BoxShape3D_body")
+
+[node name="GroundRay" type="RayCast3D" parent="."]
+target_position = Vector3(0, -1.5, 0)
+
+[node name="CameraRig" type="Node3D" parent="."]
+script = ExtResource("2_camrig")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+transform = Transform3D(1, 0, 0, 0, 0.92, 0.39, 0, -0.39, 0.92, 0, 7, 13)
+fov = 70.0
