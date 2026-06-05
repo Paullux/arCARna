@@ -22,6 +22,13 @@ robuste et maintenable.
   animés ; collision et chevrons de direction **générés automatiquement** depuis la géométrie.
 - **Ambiance** : ciel HDRI cyberpunk, glow, fog, ligne de départ en damier, VFX (explosion, étincelles).
 
+## 📸 Aperçu
+
+<p align="center">
+  <img src="assets/images/screenshots/image1.jpg" alt="Course néon avec trafic et chevrons" width="49%">
+  <img src="assets/images/screenshots/image2.jpg" alt="Recharge d'énergie aux stands" width="49%">
+</p>
+
 ## 🎮 Contrôles
 
 | Action | Clavier | Manette |
