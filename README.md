@@ -57,5 +57,9 @@ Ajuster `GODOT_VERSION` dans le workflow pour correspondre à la version utilis�
 
 Voir [`arCARna_godot_briefing.md`](arCARna_godot_briefing.md) pour les piliers de design et l'architecture.
 
+## ⚖️ Licence
+
+Distribué sous licence **GNU GPLv3** — voir [`LICENSE`](LICENSE).
+
 ---
 *Développé avec [Claude Code](https://claude.com/claude-code).*
