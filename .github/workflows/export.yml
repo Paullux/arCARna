@@ -3,11 +3,16 @@ name: Export arCARna
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   workflow_dispatch:
 
-# Version Godot — ajuster pour correspondre à votre éditeur (ex. 4.3, 4.4...).
+# Version Godot — ajuster pour correspondre à votre éditeur.
 env:
   GODOT_VERSION: "4.6.3"
+
+# Nécessaire pour créer/mettre à jour une Release avec GITHUB_TOKEN.
+permissions:
+  contents: write
 
 jobs:
   export:
@@ -28,8 +33,7 @@ jobs:
           mv templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
 
       - name: Importer les ressources
-        run: |
-          ./godot --headless --path . --import || true
+        run: ./godot --headless --path . --import || true
 
       - name: Exporter Windows + Linux
         run: |
@@ -37,9 +41,37 @@ jobs:
           ./godot --headless --path . --export-release "Windows Desktop" build/windows/arCARna.exe
           ./godot --headless --path . --export-release "Linux" build/linux/arCARna.x86_64
 
-      - name: Publier les artefacts
+      - name: Packager (zip)
+        run: |
+          cd build
+          zip -r arCARna-windows.zip windows
+          zip -r arCARna-linux.zip linux
+
+      - name: Artefacts (run)
         uses: actions/upload-artifact@v4
         with:
           name: arCARna-builds
-          path: build/
+          path: build/*.zip
           if-no-files-found: warn
+
+      - name: Déterminer le tag de Release
+        id: rel
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publier la Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          prerelease: ${{ steps.rel.outputs.prerelease }}
+          name: arCARna ${{ steps.rel.outputs.tag }}
+          body: "Build automatique (Godot ${{ env.GODOT_VERSION }}). Exécutables autonomes Windows + Linux."
+          files: |
+            build/arCARna-windows.zip
+            build/arCARna-linux.zip
