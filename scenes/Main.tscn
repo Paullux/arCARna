@@ -69,7 +69,7 @@ script = ExtResource("10_chevrons")
 script = ExtResource("16_traffic")
 
 [node name="PitZone" type="Area3D" parent="." unique_id=452528954]
-transform = Transform3D(1.0999582, 0.008726535, 0, -0.009599189, 0.9999619, 0, 0, 0, 0.55, -0.95648575, 0, -0.63936806)
+transform = Transform3D(1.1, 0, 0, 0, 1, 0, 0, 0, 0.55, -0.956, -0.1, -0.639)
 script = ExtResource("12_pit")
 flow_axis = Vector2(1, 0)
 
@@ -78,11 +78,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 6, 44)
 shape = SubResource("PitBox")
 
 [node name="Pad" type="MeshInstance3D" parent="PitZone" unique_id=899042522]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1.5, 44)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 44)
 mesh = SubResource("PadMesh")
 
 [node name="StartLine" type="MeshInstance3D" parent="." unique_id=250725828]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 44)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 44)
 mesh = SubResource("StartLineMesh")
 surface_material_override/0 = SubResource("StartMat")
 
@@ -94,7 +94,7 @@ script = ExtResource("15_finish")
 shape = SubResource("FinishBox")
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=1132420431]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.52, 0)
 
 [node name="GroundMesh" type="MeshInstance3D" parent="Ground" unique_id=873680680]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.9081726, -1.9914331, 6.091469)
