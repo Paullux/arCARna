@@ -8,10 +8,14 @@ var _player: Node
 var _lap_label: Label
 var _info_label: Label
 var _over_label: Label
+var _count_label: Label
 var _flash: float = 0.0
+
+var _traffic: Node
 
 func _ready() -> void:
 	_player = get_node_or_null(player_path)
+	_traffic = get_node_or_null("/root/Main/TrafficManager")
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_lap_label = _make_label(Vector2(28, 22), 30, HORIZONTAL_ALIGNMENT_LEFT)
 	_info_label = _make_label(Vector2(28, 62), 20, HORIZONTAL_ALIGNMENT_LEFT)
@@ -44,19 +48,33 @@ func _process(delta: float) -> void:
 		return
 	# textes tours / chrono
 	if GameManager.race_started:
-		_lap_label.text = "TOUR %d" % GameManager.current_lap
+		var pos_txt := ""
+		if _traffic != null and _player != null:
+			pos_txt = "   P%d/%d" % [_traffic.player_rank(_player.global_position), _traffic.racer_count()]
+		_lap_label.text = "TOUR %d%s" % [GameManager.current_lap, pos_txt]
 		var cur := "%s" % _fmt(GameManager.current_lap_time())
 		var best := ("  MEILLEUR %s" % _fmt(GameManager.best_lap_time)) if GameManager.best_lap_time > 0.0 else ""
 		_info_label.text = "%s%s" % [cur, best]
 	else:
-		_lap_label.text = "TRAVERSE LE DAMIER"
-		_info_label.text = ""
+		_lap_label.text = ""
+		_info_label.text = ("MEILLEUR %s" % _fmt(GameManager.best_lap_time)) if GameManager.best_lap_time > 0.0 else ""
 	_over_label.visible = GameManager.is_game_over
 	if GameManager.is_game_over:
-		_over_label.text = "💥 EXPLOSION 💥\nÉnergie épuisée\n\n[Espace] pour rejouer"
+		_over_label.text = "%s\n\n[Espace] pour rejouer" % _game_over_text()
 		_over_label.size = Vector2(600, 220)
 		_over_label.position = (size - _over_label.size) * 0.5
 	queue_redraw()
+
+func _game_over_text() -> String:
+	match GameManager.game_over_reason:
+		"fuel":
+			return "⛽ PANNE SÈCHE ⛽\nPlus de carburant"
+		"crash":
+			return "💥 CHOC DE TROP 💥\nVoiture détruite"
+		"offtrack":
+			return "🚧 SORTIE DE PISTE 🚧\nHors circuit"
+		_:
+			return "💥 EXPLOSION 💥"
 
 func _fmt(t: float) -> String:
 	var m := int(t) / 60

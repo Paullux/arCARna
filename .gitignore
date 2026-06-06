@@ -4,6 +4,9 @@
 /builds/
 *.tmp
 
+# Fichiers de travail (sources d'édition, pas nécessaires au jeu)
+*.xcf
+
 # Claude Code (config locale, machine-spécifique)
 .claude/settings.local.json
 

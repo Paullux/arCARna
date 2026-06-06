@@ -4,6 +4,8 @@
 
 # arCARna 🏎️🌃
 
+> **Retro Gaming (F-Zero / Wipe Out) + Outils modernes**
+
 Jeu de course **arcade néon** sous **Godot 4.x** (style Asphalt : sensation de vitesse exagérée,
 drift permissif, nitro spectaculaire). Reconstruction d'un prototype Three.js sur une base
 robuste et maintenable.

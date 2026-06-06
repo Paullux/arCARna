@@ -21,6 +21,7 @@ cull_mode = 1
 albedo_color = Color(0.25, 1, 0.55, 0.6)
 
 [node name="Player" type="CharacterBody3D"]
+collision_mask = 3
 script = ExtResource("1_player")
 
 [node name="CarMesh" type="Node3D" parent="."]

@@ -11,8 +11,8 @@ func _initialize() -> void:
 	cam.fov = 55.0
 	get_root().add_child(cam)
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
-	cam.size = 45.0
-	cam.position = Vector3(7, 60, 109)
+	cam.size = 55.0
+	cam.position = Vector3(20, 60, 58)
 	cam.rotation_degrees = Vector3(-90, 0, 0)
 	cam.make_current()
 

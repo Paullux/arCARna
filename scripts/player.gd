@@ -32,9 +32,19 @@ extends CharacterBody3D
 @export var shock_cost: float = 0.05           ## énergie perdue par choc encaissé
 @export var stall_grace: float = 2.5           ## sec en panne (énergie 0) avant game over
 
+@export_group("Audio")
+@export var engine_pitch_min: float = 0.7
+@export var engine_pitch_max: float = 2.0
+@export var near_miss_nitro: float = 0.08   ## bonus nitro au frôlement d'un véhicule
+@export var explosion_volume_db: float = 6.0
+@export var explosion_count: int = 4        ## nombre de détonations en chaîne
+@export var explosion_interval: float = 0.33 ## intervalle entre détonations (s)
+
 @export_group("Divers")
 @export var gravity: float = 30.0
 @export var mesh_roll: float = 0.12           ## inclinaison visuelle dans les virages
+@export var rebound_keep: float = 0.55        ## fraction de vitesse gardée au rebond sur un néon
+@export var rebound_deflect: float = 0.6      ## intensité de la déviation du cap au rebond
 
 # --- État runtime (lisible par la caméra / le HUD) ---
 var forward_speed: float = 0.0
@@ -51,12 +61,22 @@ var _aura_mat: StandardMaterial3D
 var _aura_base: Color
 var _aura_amt: float = 0.0
 var _exploded: bool = false
+var _sfx: Dictionary = {}
+var _was_nitro: bool = false
+var _near_cd: Dictionary = {}
+var _shock_frame: int = -100
+var _ride_height: float = 1.0      ## hauteur de repos au-dessus de la piste
+var _ride_calibrated: bool = false
+var _air_frames: int = 0           ## frames consécutives sans sol sous la voiture
+@onready var _traffic: Node = get_node_or_null("../TrafficManager")
+@onready var _ground: Node = get_node_or_null("../Ground")  ## plane sombre = hors piste
 
 @onready var car_mesh: Node3D = $CarMesh
 
 func _ready() -> void:
 	GameManager.reset_run()
 	_setup_glow()
+	_setup_sfx()
 
 func _setup_glow() -> void:
 	var mi := _find_mesh(car_mesh)
@@ -86,6 +106,76 @@ const TEX_EXPLOSION := preload("res://assets/images/texture/explosion.png")
 const TEX_SPARKS := preload("res://assets/images/texture/etincelle.png")
 const BURST_SHADER := preload("res://assets/shaders/vfx_burst.gdshader")
 
+const SFX := {
+	"engine": preload("res://assets/SFX/engine_loop.ogg"),
+	"nitro": preload("res://assets/SFX/nitro.ogg"),
+	"drift": preload("res://assets/SFX/drift.ogg"),
+	"impact": preload("res://assets/SFX/impact_sparks.ogg"),
+	"explosion": preload("res://assets/SFX/explosion.ogg"),
+	"recharge": preload("res://assets/SFX/recharge.ogg"),
+	"whoosh": preload("res://assets/SFX/whoosh_pass.ogg"),
+}
+
+func _setup_sfx() -> void:
+	for k in SFX:
+		var p := AudioStreamPlayer.new()
+		p.stream = SFX[k]
+		p.bus = "SFX"
+		add_child(p)
+		_sfx[k] = p
+	# boucles
+	for k in ["engine", "drift", "recharge"]:
+		if _sfx[k].stream is AudioStreamOggVorbis:
+			(_sfx[k].stream as AudioStreamOggVorbis).loop = true
+	_sfx["engine"].volume_db = -7.0
+	_sfx["drift"].volume_db = -9.0
+	_sfx["nitro"].volume_db = -3.0
+	_sfx["recharge"].volume_db = -8.0
+	_sfx["whoosh"].volume_db = -4.0
+	_sfx["impact"].volume_db = -12.5
+	_sfx["engine"].play()
+	# zone de détection near-miss (couche 2 = trafic uniquement)
+	var area := Area3D.new()
+	area.collision_layer = 0
+	area.collision_mask = 2
+	var cs := CollisionShape3D.new()
+	var sph := SphereShape3D.new()
+	sph.radius = 6.0
+	cs.shape = sph
+	cs.position = Vector3(0, 0.8, 0)
+	area.add_child(cs)
+	add_child(area)
+	area.body_entered.connect(_on_near_miss)
+
+func _update_sfx(delta: float) -> void:
+	var e: AudioStreamPlayer = _sfx["engine"]
+	var t := engine_pitch_min + (engine_pitch_max - engine_pitch_min) * clampf(absf(forward_speed) / max_speed, 0.0, 1.0)
+	e.pitch_scale = lerpf(e.pitch_scale, t, 5.0 * delta)
+	if nitro_active and not _was_nitro:
+		_sfx["nitro"].play()
+	_was_nitro = nitro_active
+	_loop_sfx("drift", is_drifting)
+	_loop_sfx("recharge", GameManager.is_recharging)
+
+func _loop_sfx(key: String, want: bool) -> void:
+	var p: AudioStreamPlayer = _sfx[key]
+	if want and not p.playing:
+		p.play()
+	elif not want and p.playing:
+		p.stop()
+
+func _on_near_miss(body: Node) -> void:
+	if GameManager.is_game_over:
+		return
+	if Engine.get_physics_frames() - _shock_frame < 8:
+		return   # c'était un choc, pas un frôlement
+	if _near_cd.has(body):
+		return
+	_near_cd[body] = true
+	get_tree().create_timer(1.5).timeout.connect(func(): _near_cd.erase(body))
+	_sfx["whoosh"].play()
+	GameManager.add_nitro(near_miss_nitro)
+
 ## Sprite billboard qui grossit (s0 -> s1) et s'estompe sur `dur` secondes.
 func _spawn_burst(tex: Texture2D, pos: Vector3, s0: float, s1: float, dur: float, brightness: float, threshold: float) -> void:
 	var mi := MeshInstance3D.new()
@@ -109,6 +199,34 @@ func _spawn_burst(tex: Texture2D, pos: Vector3, s0: float, s1: float, dur: float
 
 func _explode() -> void:
 	car_mesh.visible = false
+	for k in ["engine", "drift", "recharge"]:
+		if _sfx.has(k):
+			_sfx[k].stop()
+	_explode_visuals()
+	_play_explosion_chain()
+
+## Enchaîne plusieurs détonations (son + boule de feu) à intervalle régulier.
+func _play_explosion_chain() -> void:
+	for i in explosion_count:
+		if i == 0:
+			_boom()
+		else:
+			get_tree().create_timer(i * explosion_interval).timeout.connect(_boom)
+
+func _boom() -> void:
+	var p := AudioStreamPlayer.new()
+	p.stream = SFX["explosion"]
+	p.bus = "SFX"
+	p.volume_db = explosion_volume_db
+	p.pitch_scale = randf_range(0.85, 1.15)
+	add_child(p)
+	p.play()
+	p.finished.connect(p.queue_free)
+	var off := Vector3(randf_range(-4, 4), randf_range(2, 7), randf_range(-4, 4))
+	_spawn_burst(TEX_EXPLOSION, global_position + off, 4.0, randf_range(14.0, 24.0), 0.75, 2.3, 0.14)
+
+## Gros fireball + débris (mini boules de feu) + flash, joué une seule fois.
+func _explode_visuals() -> void:
 	var scene := get_parent()
 	var burst_pos := global_position + Vector3.UP * 6.0
 	_spawn_burst(TEX_EXPLOSION, burst_pos, 6.0, 24.0, 0.9, 2.4, 0.14)
@@ -188,6 +306,73 @@ func _find_mesh(n: Node) -> MeshInstance3D:
 			return r
 	return null
 
+## Colle la voiture à la surface de la piste (couche 1 uniquement → ignore le
+## trafic). Corrige à la fois le décollage (poussée vers le haut) et
+## l'enfoncement sous la piste (poussée vers le bas) dus à la dépénétration.
+## La hauteur de repos est auto-calibrée au premier contact au sol.
+func _stick_to_ground() -> void:
+	var space := get_world_3d().direct_space_state
+	var from := global_position + Vector3.UP * 2.0
+	var to := global_position + Vector3.DOWN * 4.0
+	var q := PhysicsRayQueryParameters3D.create(from, to)
+	q.collision_mask = 1                     # décor seulement (piste / murs)
+	q.exclude = [get_rid()]
+	var hit := space.intersect_ray(q)
+	if hit.is_empty():
+		_check_offtrack(space)               # plus de sol proche : sortie de piste ?
+		return
+	_air_frames = 0
+	# Contact avec le plane sombre (hors du Sol de la piste) = sortie de piste.
+	if _ground != null and hit.collider == _ground \
+			and not GameManager.is_game_over and GameManager.can_drive:
+		GameManager.trigger_game_over("offtrack")
+	var surface_y: float = hit.position.y
+	if not _ride_calibrated:
+		if is_on_floor():                    # premier appui franc : on mémorise l'offset
+			_ride_height = global_position.y - surface_y
+			_ride_calibrated = true
+		return
+	# replaque sur la surface (tant que l'écart reste raisonnable)
+	var target_y: float = surface_y + _ride_height
+	if absf(global_position.y - target_y) < 3.0:
+		var gp := global_position
+		gp.y = target_y
+		global_position = gp
+		if velocity.y < 0.0:
+			velocity.y = 0.0
+
+## Sortie de piste : si aucun sol (couche 1) n'est trouvé loin sous la voiture,
+## elle est au-dessus du vide → game over + explosion (après une courte grâce
+## pour ignorer les bosses/sauts ponctuels).
+func _check_offtrack(space: PhysicsDirectSpaceState3D) -> void:
+	if GameManager.is_game_over or not GameManager.can_drive:
+		return
+	var q := PhysicsRayQueryParameters3D.create(
+		global_position + Vector3.UP * 2.0, global_position + Vector3.DOWN * 80.0)
+	q.collision_mask = 1
+	q.exclude = [get_rid()]
+	if space.intersect_ray(q).is_empty():
+		_air_frames += 1
+		if _air_frames >= 18:                # ~0.3 s au-dessus du vide
+			GameManager.trigger_game_over("offtrack")
+	else:
+		_air_frames = 0
+
+## Rebond sur une barrière (néon/mur) : dévie le cap dans la direction réfléchie
+## et décolle la voiture de la paroi → impossible de la traverser ou d'y rester collé.
+func _rebound(normal: Vector3) -> void:
+	var nrm := normal
+	nrm.y = 0.0
+	if nrm.length() < 0.05:
+		return
+	nrm = nrm.normalized()
+	var hv := Vector3(velocity.x, 0.0, velocity.z)
+	var bounced := hv.bounce(nrm)
+	if bounced.length() > 0.1:
+		var desired := atan2(-bounced.x, -bounced.z)   # cap = -basis.z
+		rotation.y = lerp_angle(rotation.y, desired, rebound_deflect)
+	global_position += nrm * 0.4                        # se décolle de la barrière
+
 func _update_glow(delta: float) -> void:
 	var target := 1.0 if nitro_active else 0.0
 	_glow = move_toward(_glow, target, 6.0 * delta)
@@ -219,6 +404,15 @@ func _physics_process(delta: float) -> void:
 	var steer := Input.get_axis("steer_right", "steer_left")
 	var handbrake := Input.is_action_pressed("drift")
 	nitro_active = Input.is_action_pressed("nitro") and GameManager.nitro > 0.0
+
+	# --- Compte à rebours : voiture bloquée à la ligne de départ
+	if not GameManager.can_drive:
+		throttle = 0.0
+		braking = 0.0
+		steer = 0.0
+		handbrake = false
+		nitro_active = false
+		forward_speed = 0.0
 
 	# --- Énergie à plat : la voiture cale (plus de gaz ni de frein moteur)
 	is_stalled = GameManager.energy <= 0.0
@@ -273,18 +467,23 @@ func _physics_process(delta: float) -> void:
 	velocity.z = horiz_vel.z
 	var pre_speed := Vector2(velocity.x, velocity.z).length()
 	move_and_slide()
+	_stick_to_ground()
 	var post_speed := Vector2(velocity.x, velocity.z).length()
 
 	# 6) Choc : grosse perte de vitesse en une frame (impact mur/trafic)
 	if pre_speed - post_speed > shock_speed_loss:
 		if GameManager.energy <= 0.02:
-			GameManager.trigger_game_over()   # plus d'énergie -> explosion
+			GameManager.trigger_game_over("crash")   # choc de trop (énergie épuisée)
 		else:
 			GameManager.add_energy(-shock_cost)
-			forward_speed *= 0.4
+			forward_speed *= rebound_keep
+			_shock_frame = Engine.get_physics_frames()
+			if _sfx.has("impact"):
+				_sfx["impact"].play()
 			var cp := global_position + Vector3.UP * 1.0
 			if get_slide_collision_count() > 0:
 				cp = get_slide_collision(0).get_position()
+				_rebound(get_slide_collision(0).get_normal())   # rebond néon/mur
 			_spawn_burst(TEX_SPARKS, cp, 2.0, 13.0, 0.35, 2.2, 0.1)
 
 	# 7) Énergie : se vide en roulant (carburant)
@@ -295,7 +494,7 @@ func _physics_process(delta: float) -> void:
 	if is_stalled and absf(forward_speed) < 1.0:
 		_stall_timer += delta
 		if _stall_timer >= stall_grace:
-			GameManager.trigger_game_over()
+			GameManager.trigger_game_over("fuel")
 	else:
 		_stall_timer = 0.0
 
@@ -310,3 +509,4 @@ func _physics_process(delta: float) -> void:
 		car_mesh.rotation.z = lerpf(car_mesh.rotation.z, -steer * mesh_roll, 8.0 * delta)
 	_update_glow(delta)
 	_update_aura(delta)
+	_update_sfx(delta)

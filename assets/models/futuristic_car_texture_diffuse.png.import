@@ -2,14 +2,11 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://1nxyxq5adwan"
+uid="uid://drs4w0xkix7cu"
 path.s3tc="res://.godot/imported/futuristic_car_texture_diffuse.png-6049346c77f8607eed45172374603b3e.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
-}
-generator_parameters={
-"md5": "d454f380331176aa251ea85bca14ad6e"
 }
 
 [deps]

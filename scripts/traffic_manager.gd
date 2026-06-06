@@ -15,6 +15,7 @@ const TINT_SHADER := preload("res://assets/shaders/car_tint.gdshader")
 
 var _curve: Curve3D
 var _length: float = 0.0
+var _start_prog: float = 0.0
 var _cars: Array = []      # [{body, progress, lane}]
 var _albedo_tex: Texture2D
 var _has_tex: bool = false
@@ -27,15 +28,31 @@ func _ready() -> void:
 		push_warning("[Traffic] CenterLine introuvable")
 		return
 	_length = _curve.get_baked_length()
+	_start_prog = _find_start_progress()
 	for i in count:
 		_spawn(i)
+
+## Progression sur la spline la plus proche de la ligne de départ (monde ~ x=0,z=44).
+func _find_start_progress() -> float:
+	var best := 0.0
+	var bestd := INF
+	var d := 0.0
+	while d < _length:
+		var p := _curve.sample_baked(d)
+		var dist := Vector2(p.x, p.z - 44.0).length()
+		if dist < bestd:
+			bestd = dist
+			best = d
+		d += 4.0
+	return best
 
 func _physics_process(delta: float) -> void:
 	if _curve == null:
 		return
 	var space := get_world_3d().direct_space_state
 	for c in _cars:
-		c.progress = fmod(c.progress + speed * delta, _length)
+		if GameManager.can_drive:        # bloquées sur la grille avant le START
+			c.progress = fmod(c.progress + speed * delta, _length)
 		var pos: Vector3 = _curve.sample_baked(c.progress)
 		var ahead: Vector3 = _curve.sample_baked(fmod(c.progress + 3.0, _length))
 		var tan := ahead - pos
@@ -50,9 +67,35 @@ func _physics_process(delta: float) -> void:
 		body.global_position = p
 		body.look_at(p + tan, Vector3.UP)
 
+## Nombre total de concurrents (trafic + joueur).
+func racer_count() -> int:
+	return _cars.size() + 1
+
+## Classement du joueur (1 = en tête). On projette la position du joueur sur la
+## spline et on compte les voitures « devant » (écart vers l'avant < demi-tour).
+func player_rank(player_global: Vector3) -> int:
+	if _curve == null:
+		return 1
+	var pprog := _curve.get_closest_offset(player_global)
+	var ahead := 0
+	for c in _cars:
+		var gap: float = fposmod(c.progress - pprog, _length)
+		if gap > 0.5 and gap < _length * 0.5:
+			ahead += 1
+	return ahead + 1
+
+## Distance horizontale (XZ) entre un point et la ligne centrale de la piste.
+## Sert à détecter la sortie de piste (au-delà de la largeur jouable).
+func dist_from_center(p: Vector3) -> float:
+	if _curve == null:
+		return 0.0
+	var cp := _curve.get_closest_point(Vector3(p.x, 0.0, p.z))
+	return Vector2(p.x - cp.x, p.z - cp.z).length()
+
 func _spawn(i: int) -> void:
 	var body := AnimatableBody3D.new()
 	body.sync_to_physics = false
+	body.collision_layer = 2   # couche 2 uniquement (le rayon de sol = couche 1 l'ignore)
 	var cs := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = Vector3(2.0, 1.6, 4.4)
@@ -69,7 +112,10 @@ func _spawn(i: int) -> void:
 	_tint(model, col)
 
 	add_child(body)
-	_cars.append({"body": body, "progress": _length * float(i) / count, "lane": lane_offsets[i % lane_offsets.size()]})
+	# grille de départ : rangées derrière la ligne, voies en alternance
+	var lanes := lane_offsets.size()
+	var prog := fposmod(_start_prog - 10.0 - float(i / lanes) * 8.0, _length)
+	_cars.append({"body": body, "progress": prog, "lane": lane_offsets[i % lanes]})
 
 func _tint(root: Node, col: Color) -> void:
 	for mi in root.find_children("*", "MeshInstance3D", true, false):

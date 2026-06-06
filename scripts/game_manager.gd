@@ -14,7 +14,15 @@ var current_lap: int = 0
 var last_lap_time: float = 0.0
 var best_lap_time: float = 0.0
 var race_started: bool = false
+var can_drive: bool = false      ## faux pendant le compte à rebours
 var _lap_start: float = 0.0
+
+## Appelé par le compte à rebours au "START".
+func start_race() -> void:
+	race_started = true
+	can_drive = true
+	current_lap = 1
+	_lap_start = _now()
 
 ## Temps écoulé sur le tour courant (s).
 func current_lap_time() -> float:
@@ -27,12 +35,8 @@ func _now() -> float:
 
 ## Appelé par la ligne d'arrivée à chaque passage sur le damier.
 func register_lap_crossing() -> void:
-	if is_game_over:
-		return
-	if not race_started:
-		race_started = true
-		current_lap = 1
-		_lap_start = _now()
+	# Ignore le passage au spawn : la course démarre via start_race() (compte à rebours).
+	if is_game_over or not race_started:
 		return
 	last_lap_time = _now() - _lap_start
 	if best_lap_time == 0.0 or last_lap_time < best_lap_time:
@@ -59,7 +63,17 @@ func _ready() -> void:
 	var tex: Texture2D = load("res://assets/images/ico/arCARna.png")
 	if tex:
 		DisplayServer.set_icon(tex.get_image())
+	_setup_buses()
 	_load_best()
+
+## Crée les bus audio Music / SFX (routés vers Master) s'ils n'existent pas.
+func _setup_buses() -> void:
+	for b in ["Music", "SFX"]:
+		if AudioServer.get_bus_index(b) == -1:
+			AudioServer.add_bus()
+			var idx := AudioServer.bus_count - 1
+			AudioServer.set_bus_name(idx, b)
+			AudioServer.set_bus_send(idx, "Master")
 
 func _load_best() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
@@ -79,10 +93,12 @@ func reset_run() -> void:
 	energy = ENERGY_MAX
 	nitro = 0.0
 	is_game_over = false
+	game_over_reason = ""
 	is_recharging = false
 	current_lap = 0
 	last_lap_time = 0.0
 	race_started = false
+	can_drive = false
 	# best_lap_time conservé (persiste entre les parties)
 	energy_changed.emit(energy)
 	nitro_changed.emit(nitro)
@@ -96,10 +112,15 @@ func add_energy(amount: float) -> void:
 	if energy != before:
 		energy_changed.emit(energy)
 
-func trigger_game_over() -> void:
+## Raison du game over : "fuel" (carburant vide), "crash" (choc de trop),
+## "offtrack" (sortie de piste), ou "" (générique).
+var game_over_reason: String = ""
+
+func trigger_game_over(reason: String = "") -> void:
 	if is_game_over:
 		return
 	is_game_over = true
+	game_over_reason = reason
 	game_over_changed.emit(true)
 
 func add_nitro(amount: float) -> void:
